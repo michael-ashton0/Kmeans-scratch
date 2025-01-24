@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from random import randint
 
-X, y = make_blobs(n_samples=500, n_features=2, cluster_std=0.7, centers=5, random_state=42)
+X, y = make_blobs(n_samples=500, n_features=2, cluster_std=0.7, centers=5, random_state=453)
 
 def euclidean(point1, point2):
     """
@@ -27,7 +27,6 @@ class KMeans:
         '''
         Creates Centroids for data (modifies self.centroids)
         '''
-        previous_centroids = []
 
         #Get the first centroid
         first_centroid = self.data[randint(0, len(self.data))]
@@ -54,44 +53,52 @@ class KMeans:
         self.centroids = np.array(self.centroids) #Change to numpy array
 
         #Iterate to improve centroids
-        ###ISSUE IS HERE
-        while self.iterations != self.max_iter:
+        while self.iterations < self.max_iter:
+        #Assign points to the nearest centroid
             labels = self.predict()
-            labels = np.argmin(np.linalg.norm(self.data[:, None, :] - self.centroids[None, :], axis=2), axis=1)
+            self.labels = labels
 
-            new_centroids = []
-            for cluster in range(self.n_clusters):
-                new_centroids.append(np.mean(self.data[labels == cluster], axis=0))
-                self.iterations +=1
+            #Update Centroids
+            new_centroids = np.array([
+                np.mean(self.data[labels == cluster], axis=0) 
+                if np.any(labels == cluster) else self.centroids[cluster]
+                for cluster in range(self.n_clusters) #Multi-line list comprehension is disgusting but satisfying to pull off
+            ])
 
-            if len(previous_centroids) != 0 and np.allclose(self.centroids, previous_centroids, atol=1e-6):
-                return
-                
-            distances = []
+            self.iterations += 1
 
-            for cluster_idx in range(len(self.centroids)):
-                cluster_points = self.data[self.labels == cluster_idx]
-                distances.append(np.mean(np.linalg.norm(cluster_points - self.centroids[cluster_idx])))
+            #Convergence Check
+            if np.allclose(new_centroids, self.centroids, atol=1e-6):
+                break
+            
+            #Reassign centroids to the newly calculated set
+            self.centroids = new_centroids
 
-            if len(previous_centroids) != 0 and np.allclose(self.centroids, previous_centroids, atol=1e-6):
-                return
-                        
-            previous_centroids = self.centroids
+        return self
 
     def predict(self):
+        '''
+        Assigns points to centroid clusters, and returns an np array of those cluster assignments
+        '''
         for i, point in enumerate(self.data):
             distances = [euclidean(point, centroid) for centroid in self.centroids]
             self.labels[i] = np.argmin(distances)
         return self.labels
 
     def fit_predict(self, data):
+        '''
+        Runs fit and predict functions
+        '''
         self.fit()
         return self.predict(data)
     
     def score(self):
+        '''
+        Calculate the sum of the squared distances between each point and its centroid
+        '''
         self.inertia = 0
         combined = zip(self.data, self.labels)
-        print(self.centroids)
+        #print(self.centroids)
         for point, centroid in combined:
             self.inertia += (euclidean(point, self.centroids[int(centroid)]) ** 2)
         
